@@ -7,6 +7,22 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+# Each of the classes below act as schemas, simular to what I've used for Express and MongoDB (Mongoose)
+# The pydantic classes are used to define how the email_extractor agent should structure data.
+# This allows me to iterate through the JSON structure to create the email summary.
+
+
+# Why this works great with LLMs like OpenAI:
+# The Agents SDK or function calling system can take your Pydantic schema and use it to:
+
+# Validate and parse the LLM's raw output (string → structured data).
+# Autogenerate JSON examples that match the schema during function calling.
+# Catch missing or misformatted fields before they break your app logic.
+
+# Ps, Mongoose (MongoDB) schemas could follow this same idea and be  used to structure LLM responses
+# This would be relevant for MERN Stack applications
+
+
 # Define person data model (Using pydantic??)
 class Person(BaseModel):
     name: str
@@ -93,6 +109,8 @@ sample_email = """
 async def process_email(email_text):
     result = await Runner.run(email_extractor, f"Please extract information from this email:\n\n{email_text}")
     result = result.final_output
+
+    # Formatting the
     print(f"Subject: {result.subject}")
     print(f"From: {result.sender.name} ({result.sender.role})")
     print("\nMain points:")
@@ -110,6 +128,6 @@ async def process_email(email_text):
             f"  Assignee: {task.assignee}, Deadline: {task.deadline}, Priority: {task.priority}"
         )
 
-
+# Initialing the process_email function
 if __name__ == "__main__":
     asyncio.run(process_email(sample_email))
