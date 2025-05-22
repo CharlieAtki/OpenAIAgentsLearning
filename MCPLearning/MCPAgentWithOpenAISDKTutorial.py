@@ -41,6 +41,7 @@ samples_dir = os.path.join(current_dir)
 # "command": "uvx",
 # "args": ["mcp-server-fetch"],
 
+# For the purpose of agent configuration and understanding its capabilities, you can think of mcp_web_fetch as representing the MCP server for web fetching.
 mcp_web_fetch = MCPServerStdio(
     params={
         "command": "uvx",
@@ -48,23 +49,23 @@ mcp_web_fetch = MCPServerStdio(
     }
 )
 
+# The agent acts as a client on the mcp_web_fetch server. Upon runtime, the client dynamically discovers the availaible tools on the MCP server
+async def handle_request(request):
+    agent = Agent(name="Assistant",
+      model="gpt-4.1-mini",
+      instructions="You are a helpful assistant for our staff within the business",
+      mcp_servers=[mcp_web_fetch],
+      tools=[get_time])
 
-async def async_main():
-    async with mcp_web_fetch:
-        agent = Agent(name="Assistant",
-          model="gpt-4.1-mini",
-          instructions="You are a helpful assistant",
-          mcp_servers=[mcp_web_fetch],
-          tools=[get_time])
+    result = await Runner.run(
+        agent, """
+        Please get the content of docs.replit.com/updates and summarize them. 
+        Return the summary as well as the time you got the content.
+        """)
 
-        result = await Runner.run(
-            agent, """
-            Please get the content of docs.replit.com/updates and summarize them. 
-            Return the summary as well as the time you got the content.
-            """)
+    print(result.final_output)
 
-        print(result.final_output)
-
-
-if __name__ == "__main__":
-  asyncio.run(async_main())
+# Stating the runtime when the file is run
+# asycio ensures that the application will run asynchronously
+if __name__ == '__main__':
+    asyncio.run(handle_request("Okay, do you have any listing recommendations from the marketplace"))
