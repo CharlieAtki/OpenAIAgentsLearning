@@ -16,5 +16,6 @@ def add_numbers(a: int, b: int) -> int:
     """Adds two numbers together."""
     return a + b
 
+# run the custom MCP server
 if __name__ == "__main__":
     mcp.run()

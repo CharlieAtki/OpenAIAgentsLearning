@@ -14,6 +14,11 @@ from typing import List, Optional
 from datetime import datetime
 from agents import Agent, Runner, function_tool
 
+load_dotenv()
+
+# Get the value
+MONGO_URI = os.getenv("MONGO_URI")
+
 # Pydantic model for the data required to send an email
 class OutgoingEmail(BaseModel):
     """
@@ -31,6 +36,7 @@ class OutgoingEmail(BaseModel):
 async def get_time() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+# Custom tool to get the email address -> Could use MCP to use the MongoDB database to get all known email addresses rather than a hardcoded one / function tool
 @function_tool
 async def get_email_address() -> str:
     return "charlie06atkinson@gmail.com"
@@ -51,6 +57,7 @@ def send_email_logic(to_email: str, subject: str, plain_text_content: str, html_
     # Loading the .env variables from the .env file
     load_dotenv()
 
+    # Twilio SendGrid API information (required for sending emails)
     api_key = os.environ.get('SENDGRID_API_KEY')
     from_email_address = 'juzatkia@gmail.com'  # Replace with your verified SendGrid sender email
 
@@ -104,6 +111,9 @@ def send_email_logic(to_email: str, subject: str, plain_text_content: str, html_
 # Loading the .env variables from the .env file
 load_dotenv()
 
+# MCP Servers
+
+# MCP Server for fetching web content
 mcp_web_fetch = MCPServerStdio(
     params={
         "command": "uvx",
@@ -111,6 +121,20 @@ mcp_web_fetch = MCPServerStdio(
     }
 )
 
+# MCP Server for MongoDB database operations
+mongoDB_server = MCPServerStdio(
+    name="MongoDB Server",
+    params={
+        "command": "npx",
+        "args": ["-y", "mongodb-mcp-server"],
+        "env": {
+            "MDB_MCP_CONNECTION_STRING": f"{MONGO_URI}"
+        }
+    },
+    cache_tools_list=True,
+)
+
+# Agent for sending emails
 email_agent = Agent(
     name="EmailAssistant",
     model="gpt-4.1-mini", # Or your preferred model
@@ -126,6 +150,7 @@ email_agent = Agent(
     Use the tools in this sequence:
     - Call `get_time` once to retrieve relevant contextual information such as product launch dates.
     - Call `get_email_addresses` once to get the correct recipient's email.
+    - Call 'mongoDB_server' to get the correct listings from AppriseMarketplaceDatabase listings collection.
     - Once all information is gathered, call `send_email_logic` with the full, polished email content.
 
     The email must:
@@ -141,10 +166,11 @@ email_agent = Agent(
     """
     ,
     tools=[get_time, send_email_logic, get_email_address], # And any other tools
-    mcp_servers=[mcp_web_fetch],
+    mcp_servers=[mongoDB_server],
     output_type=OutgoingEmail
 )
 
+# Agent for handling inital enquiries. Agent can pass onto specalised agents based on the enquiry.
 triage_agent = Agent(
     name = "Internal Business Agent",
     instructions="""You are the internal business agent, desinged to assist employees carryout their work.
@@ -155,12 +181,13 @@ triage_agent = Agent(
     
     Always be polite and helpful, and ensure a smooth transition when handing off to specialists.
     """,
-    mcp_servers=[ mcp_web_fetch ],
+    mcp_servers=[ mongoDB_server ],
     handoffs=[email_agent]
 )
 
+# Starting MCP dynamic discovery on runtime ??? I think. Need to figure out how to add multiple MCP servers
 async def handle_request(request):
-    async with mcp_web_fetch:
+    async with mongoDB_server:
         result = await Runner.run(triage_agent, request)
         print(result.final_output)
 
@@ -169,10 +196,9 @@ async def handle_request(request):
 # asycio ensures that the application will run asynchronously
 if __name__ == '__main__':
     asyncio.run(handle_request(request=  """Hello, I need to create a marketing email for the new product launch.
-    Please talk about the Model Context Protocal (MCP) and the new product called AI agents.
+    Please talk about the Model Context Protocal (MCP) and how it allows me to easily fetch our listings information from the MongoDB database.
     
-    To make sure you are informed about the new protocol, please reserach the web for the latest news.
-    https://modelcontextprotocol.io/introduction is a good start.
+    To make sure you are informed about the new protocol, please fetch information about our current listings from the MongoDB database and include it in the email.
     
     Also, please include the date the new product is going to be released within the email.
     
